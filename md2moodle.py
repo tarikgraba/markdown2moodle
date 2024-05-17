@@ -1,4 +1,4 @@
-# Markdown to Moodle XML 
+# Markdown to Moodle XML
 #
 # This script parses a markdown file (containing quizes) and outputs Moodle's XML Quiz format.
 #
@@ -23,11 +23,11 @@
 # This script is organized into the following sections:
 #
 # Section 0 - Global constants
-# Section 1 - REGEX patterns, helpers and transformations over text 
+# Section 1 - REGEX patterns, helpers and transformations over text
 # Section 2 - Quiz class, helper functions and constants
 # Section 3 - FSM implementation
 # Section 4 - FSM Markdown Parser
-# Section 5 - Main 
+# Section 5 - Main
 
 import os
 import sys
@@ -57,14 +57,14 @@ CONFIG = {
 
     # Place table borders through css style?
     'table_border' : False,
-    
+
     # quiz answer numbering | allowed values: 'none', 'abc', 'ABCD' or '123'
-    'answer_numbering' : 'abc', 
+    'answer_numbering' : 'abc',
     # quiz shuffle answers | 1 -> true ; 0 -> false
     'shuffle_answers' : '1',
 
     # in single answer questions, the penalty to apply to a wrong answer in % [0,1]
-    'single_answer_penalty_weight' : 0, #e.g., 0.25 = 25% 
+    'single_answer_penalty_weight' : 0, #e.g., 0.25 = 25%
 
     # pygments code snapshot generator
     'pygments.font_size' : 16,
@@ -77,7 +77,7 @@ CONFIG = {
 }
 
 ######################################################################
-# Section 1 - REGEX patterns, helpers and transformations over text 
+# Section 1 - REGEX patterns, helpers and transformations over text
 ######################################################################
 
 ##
@@ -134,7 +134,7 @@ def is_blockcode(string):
 def is_eof(string):
     return string == "EOF"
 
-## 
+##
 # REGEX matching  and grouping
 
 def get_header(string):
@@ -178,8 +178,8 @@ def sanitize_entities(text):
     text = text.replace('&','&amp;')
     text = text.replace('>','&gt;')
     text = text.replace('<','&lt;')
-    text = text.replace('*','&ast;')    
-        
+    text = text.replace('*','&ast;')
+
     return text
 
 def render_answer(text):
@@ -189,7 +189,7 @@ def render_answer(text):
     text = re.sub(SINGLE_LINE_CODE_PATTERN, replace_single_line_code, text)
     text = re.sub(SINGLE_DOLLAR_LATEX_PATTERN, replace_latex, text)
 
-    return wrap_cdata( markdown( text ) ) 
+    return wrap_cdata( markdown( text ) )
 
 def render_question(text, md_dir_path):
     """Replaces any allowed contents, e.g., code and images
@@ -207,7 +207,7 @@ def render_question(text, md_dir_path):
 def markdown_custom(text):
     """Just calls markdown, but may be extended in the future."""
     return markdown(text)
-    
+
 def replace_table(match):
     content = match.group(2)
 
@@ -270,7 +270,7 @@ def replace_multi_line_code(match):
 
     if not lexer:
         lexer = ''
-    
+
     to_image = True if lexer.find('{img}') > 0 else False
 
     if to_image:
@@ -304,7 +304,7 @@ def build_image_tag(file_name):
 
 def convert_code_image_base64(lexer_name, code):
     """Converts a code snippet to an image in base64 format."""
-    
+
     from pygments import highlight
     from pygments.lexers import get_lexer_by_name
     from pygments.formatters import ImageFormatter
@@ -328,7 +328,7 @@ def convert_code_image_base64(lexer_name, code):
         imgFile = './' + str(img_id) + '.png'
         with open(imgFile, 'wb') as imageOut:
             imageOut.write(imgBytes)
-        
+
         img_id += 1
         CONFIG['pygments.dump_image_id'] = img_id
 
@@ -339,7 +339,7 @@ def convert_code_image_base64(lexer_name, code):
     extension = 'png'
     base64_image = (base64.b64encode(temp.read())).decode('utf-8')
     src_part = 'data:image/' + extension + ';base64,' + base64_image
-    
+
     temp.close()
     return '<img style="display:block;" src="' + src_part + '" />'
 
@@ -354,8 +354,8 @@ class QuizError(Exception):
 class Quiz(dict):
     def __init__(self, *args, default=None, **kwargs):
         super().__init__(*args, **kwargs)
-        
-        self.section = [] 
+
+        self.section = []
         self.current_question = {}
 
         self.is_valid = False
@@ -372,7 +372,7 @@ class Quiz(dict):
         self.current_question = {'text': get_question(line), 'answers': []}
         self.section.append(self.current_question)
 
-    def append_to_question(self, line): 
+    def append_to_question(self, line):
         """Appends content to current question."""
 
         #TODO: there's a problem enforcing line breaks in the output
@@ -387,7 +387,7 @@ class Quiz(dict):
                 'text': get_correct_answer(line),
                 'correct': True
                 }
-            
+
             self.current_question['answers'].append(current_answer)
 
         elif is_wrong_answer(line):
@@ -396,7 +396,7 @@ class Quiz(dict):
                 'text': get_wrong_answer(line),
                 'correct': False
                 }
-            
+
             self.current_question['answers'].append(current_answer)
 
         else:
@@ -406,13 +406,13 @@ class Quiz(dict):
     def current_question_has_correct_answers(self):
         correct_answers = [x for x in self.current_question['answers'] if x['correct']]
         correct_answer_count = len(correct_answers)
-        
+
         return (correct_answer_count >= 1)
 
     def validate(self):
         """Must call after successful parse of document."""
         self.__complete()
-        self.is_valid = True        
+        self.is_valid = True
 
     def __complete(self):
         """Completes parsed information with 'fraction' values for answers."""
@@ -422,7 +422,7 @@ class Quiz(dict):
             for question in section:
                 correct_answers = [x for x in question['answers'] if x['correct']]
                 correct_answer_count = len(correct_answers)
-                
+
                 if correct_answer_count < 1:
                     self.is_valid = False
                     raise QuizError("No correct answer(s) for %s" % (question['text']))
@@ -440,7 +440,7 @@ class Quiz(dict):
 
     def export_xml_to_file(self, md_file_name):
         """Produces the XML file outputs; one for each specified category in the md file."""
-        if self.is_valid:            
+        if self.is_valid:
             md_dir_path = os.path.dirname(os.path.abspath(md_file_name))
 
             for section_caption in self:
@@ -460,7 +460,7 @@ class Quiz(dict):
         """Produces the XML output and returns the resulting text."""
         if self.is_valid:
             md_dir_path = os.getcwd()
-            result = {}            
+            result = {}
             for section_caption in self:
                 section = self[section_caption]
                 result[section_caption] = section_to_xml(section_caption, section, md_dir_path)
@@ -468,8 +468,8 @@ class Quiz(dict):
         else:
             print("Quiz is not marked as valid for export.")
             return ""
-        
-        
+
+
 def create_output_filename(md_file_name, section_caption):
     """Generates and sanitizes .xml output filename.
 
@@ -495,10 +495,10 @@ def section_to_xml(section_caption, section, md_dir_path):
     """
 
     xml = '<?xml version="1.0" ?><quiz>'
-    
+
     #create dummy question to specify category for questions
     xml += '<question type="category"><category><text>' + section_caption + '</text></category></question>'
-    
+
     #add parsed questions
     for index, question in enumerate(section):
         xml += question_to_xml(question, index, md_dir_path)
@@ -521,7 +521,7 @@ def question_to_xml(question, index, md_dir_path):
     index_part = str(index + 1).rjust(4, '0')
     q_part = (question['text'] + str(random.random())).encode('utf-8')
     question_single_status = ('true' if question['single'] else 'false')
-    
+
     xml = '<question type="multichoice">'
     # question name
     xml += '<name><text>'
@@ -534,7 +534,7 @@ def question_to_xml(question, index, md_dir_path):
     # answer
     for answer in question['answers']:
         xml += answer_to_xml(answer)
-    
+
     # other properties
     xml += '<shuffleanswers>' + CONFIG['shuffle_answers'] + '</shuffleanswers>'
     xml += '<single>' + question_single_status + '</single>'
@@ -571,7 +571,7 @@ class TransitionError(Exception):
 
 class StateMachine:
     """
-    Provides the definition of a finite state machine in python that 
+    Provides the definition of a finite state machine in python that
     enables to change state and run a parsed line within that state,
     i.e., the FSM will run a delegate function according to its current
     state.
@@ -591,7 +591,7 @@ class StateMachine:
 
     def set_start(self, name):
         """Sets the start state (name).
-        The state must have been previously added through 'add_state' method. 
+        The state must have been previously added through 'add_state' method.
         """
         self.state = name.upper()
 
@@ -604,10 +604,10 @@ class StateMachine:
             raise InitializationError("must call .set_start() before .run()")
         if not self.endStates:
             raise  InitializationError("at least one state must be an end_state")
-    
+
         if CONFIG['debug']:
             print("In state %25s | Processing: %s" %(self.state, line_text))
-        
+
         newState = handler(quest, line_text, line_number)
         self.state = newState.upper()
 
@@ -628,7 +628,7 @@ class StateMachine:
 # but may be useful in the future for some reason.
 
 def state_start(quiz, line_text, line_number):
-    
+
     if is_blank(line_text):
         state = "start"
     elif is_header(line_text):
@@ -643,7 +643,7 @@ def state_start(quiz, line_text, line_number):
     return state
 
 def state_parse_header(quiz, line_text, line_number):
-    
+
     if is_blank(line_text):
         # do nothing
         state = "parse_header"
@@ -724,7 +724,7 @@ def state_parse_answer(quiz, line_text, line_number):
 def state_end(quiz, line_text, line_number):
     """End state."""
     pass
-    
+
 ##
 # The Parser loop
 
@@ -733,7 +733,7 @@ def parse_file(md_script):
     Parses the markdown file one line at a time and returns a Quiz
 
     :param md_script: list of file lines
-	:type md_script: list
+    :type md_script: list
     """
 
     # Create Quiz
@@ -741,7 +741,7 @@ def parse_file(md_script):
 
     # Initialize state machine
     m = StateMachine()
-    
+
     m.add_state("start", state_start)
     m.add_state("parse_header", state_parse_header)
     m.add_state("parse_question", state_parse_question)
@@ -759,11 +759,11 @@ def parse_file(md_script):
         for md_row in md_lines:
             md_row = md_row.rstrip('\r')
             md_row = md_row.rstrip('\n')
-            
+
             m.run(quiz, md_row, line_number)
 
             line_number += 1
-        
+
     except TransitionError as e:
         print("Error at line %d: %s." % (line_number, e))
         quiz = None
